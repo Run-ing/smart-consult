@@ -1,0 +1,38 @@
+# Maven
+target/
+*.class
+
+# Spring Boot
+*.log
+logs/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Build tool wrappers and caches
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# Packaged artifacts
+*.jar
+*.war
+*.ear
