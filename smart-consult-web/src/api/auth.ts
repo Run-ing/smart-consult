@@ -12,6 +12,7 @@ export interface UserProfile {
   nickname: string
   avatarUrl?: string | null
   lastLoginTime?: string | null
+  profileCompleted: boolean
 }
 
 export interface LoginResponse {
@@ -34,5 +35,29 @@ export async function loginWithSmsCode(phone: string, smsCode: string): Promise<
 
 export async function fetchCurrentUser(): Promise<UserProfile> {
   const response = await http.get<ApiResult<UserProfile>>('/auth/me')
+  return response.data.data!
+}
+
+export interface HealthProfileRequest {
+  sex: 'MALE' | 'FEMALE'
+  birthDate: string
+  heightCm: number
+  weightKg: number
+  waistCm?: number | null
+}
+
+export interface HealthProfile {
+  id: number
+  userId: number
+  sex: 'MALE' | 'FEMALE'
+  birthDate: string
+  age: number
+  heightCm: number
+  weightKg: number
+  waistCm?: number | null
+}
+
+export async function saveHealthProfile(payload: HealthProfileRequest): Promise<HealthProfile> {
+  const response = await http.post<ApiResult<HealthProfile>>('/user/profile', payload)
   return response.data.data!
 }

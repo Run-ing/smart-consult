@@ -61,7 +61,7 @@ async function submitLogin() {
     try {
         const response = await loginWithSmsCode(phone.value, smsCode.value);
         setAuth(response.token, response.user);
-        await router.push('/home');
+        await router.push(response.user.profileCompleted ? '/home' : '/profile-setup');
     }
     catch (error) {
         errorMessage.value = getApiErrorMessage(error);

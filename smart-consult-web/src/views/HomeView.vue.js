@@ -19,6 +19,9 @@ onMounted(async () => {
         const currentUser = await fetchCurrentUser();
         user.value = currentUser;
         setAuth(getToken(), currentUser);
+        if (!currentUser.profileCompleted) {
+            await router.push('/profile-setup');
+        }
     }
     catch {
         clearAuth();

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import LoginView from '../views/LoginView.vue';
 import HomeView from '../views/HomeView.vue';
-import { getToken } from '../stores/auth';
+import ProfileSetupView from '../views/ProfileSetupView.vue';
+import { getStoredUser, getToken } from '../stores/auth';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -21,14 +22,30 @@ const router = createRouter({
             meta: {
                 requiresAuth: true
             }
+        },
+        {
+            path: '/profile-setup',
+            name: 'profile-setup',
+            component: ProfileSetupView,
+            meta: {
+                requiresAuth: true
+            }
         }
     ]
 });
 router.beforeEach((to) => {
-    if (to.meta.requiresAuth && !getToken()) {
+    const token = getToken();
+    const user = getStoredUser();
+    if (to.meta.requiresAuth && !token) {
         return '/login';
     }
-    if (to.path === '/login' && getToken()) {
+    if (token && user && !user.profileCompleted && to.path !== '/profile-setup') {
+        return '/profile-setup';
+    }
+    if (to.path === '/login' && token) {
+        return user?.profileCompleted === false ? '/profile-setup' : '/home';
+    }
+    if (to.path === '/profile-setup' && token && user?.profileCompleted) {
         return '/home';
     }
     return true;
