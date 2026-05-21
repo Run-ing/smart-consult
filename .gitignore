@@ -1,6 +1,8 @@
 # Maven
 target/
 *.class
+.m2-temp/
+.npm-cache/
 
 # Spring Boot
 *.log
@@ -31,6 +33,10 @@ Thumbs.db
 # Build tool wrappers and caches
 .mvn/wrapper/maven-wrapper.jar
 .mvn/timing.properties
+
+# Frontend
+smart-consult-web/node_modules/
+smart-consult-web/dist/
 
 # Packaged artifacts
 *.jar

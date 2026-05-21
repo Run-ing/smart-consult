@@ -4,17 +4,23 @@ import com.example.smartconsult.common.Result;
 import com.example.smartconsult.common.ResultCode;
 import com.example.smartconsult.exception.BusinessException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -23,10 +29,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class CommonWebFoundationTest {
 
     private final MockMvc mockMvc;
 
+    @Autowired
     CommonWebFoundationTest(MockMvc mockMvc) {
         this.mockMvc = mockMvc;
     }
@@ -59,12 +68,15 @@ class CommonWebFoundationTest {
     }
 
     @Test
-    void unexpectedExceptionReturnsSystemErrorResult() throws Exception {
+    void unexpectedExceptionReturnsSystemErrorResult(CapturedOutput output) throws Exception {
         mockMvc.perform(get("/test/system-error"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(ResultCode.SYSTEM_ERROR.getCode()))
                 .andExpect(jsonPath("$.message").value(ResultCode.SYSTEM_ERROR.getMessage()))
                 .andExpect(jsonPath("$.data").doesNotExist());
+
+        assertTrue(output.toString().contains("Unhandled exception"));
+        assertTrue(output.toString().contains("boom"));
     }
 
     @Test
