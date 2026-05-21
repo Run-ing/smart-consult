@@ -5,6 +5,7 @@ import com.example.smartconsult.auth.dto.LoginResponse;
 import com.example.smartconsult.auth.dto.SmsCodeRequest;
 import com.example.smartconsult.auth.dto.SmsCodeResponse;
 import com.example.smartconsult.common.Result;
+import com.example.smartconsult.user.UserHealthProfileService;
 import com.example.smartconsult.user.UserService;
 import com.example.smartconsult.user.dto.UserProfileResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,10 +20,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final UserHealthProfileService userHealthProfileService;
 
-    public AuthController(AuthService authService, UserService userService) {
+    public AuthController(AuthService authService, UserService userService, UserHealthProfileService userHealthProfileService) {
         this.authService = authService;
         this.userService = userService;
+        this.userHealthProfileService = userHealthProfileService;
     }
 
     @PostMapping("/sms-code")
@@ -38,6 +41,8 @@ public class AuthController {
     @GetMapping("/me")
     public Result<UserProfileResponse> me() {
         CurrentUser currentUser = CurrentUserContext.getRequired();
-        return Result.success(UserProfileResponse.from(userService.findById(currentUser.id())));
+        return Result.success(UserProfileResponse.from(
+                userService.findById(currentUser.id()),
+                userHealthProfileService.existsByUserId(currentUser.id())));
     }
 }

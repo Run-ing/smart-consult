@@ -28,3 +28,19 @@ CREATE TABLE IF NOT EXISTS sms_verification_code (
   KEY idx_sms_code_phone_scene_status (phone, scene, status),
   KEY idx_sms_code_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信验证码表';
+
+CREATE TABLE IF NOT EXISTS user_health_profile (
+  id BIGINT NOT NULL AUTO_INCREMENT COMMENT '画像ID',
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  sex VARCHAR(16) NOT NULL COMMENT '性别：MALE男性，FEMALE女性',
+  birth_date DATE NOT NULL COMMENT '出生日期',
+  height_cm DECIMAL(5,2) NOT NULL COMMENT '身高cm',
+  weight_kg DECIMAL(5,2) NOT NULL COMMENT '体重kg',
+  waist_cm DECIMAL(5,2) NULL COMMENT '腰围cm',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_user_health_profile_user_id (user_id),
+  KEY idx_user_health_profile_sex (sex),
+  KEY idx_user_health_profile_birth_date (birth_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户健康画像表';

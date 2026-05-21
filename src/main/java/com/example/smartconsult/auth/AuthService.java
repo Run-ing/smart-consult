@@ -8,6 +8,7 @@ import com.example.smartconsult.auth.dto.SmsCodeResponse;
 import com.example.smartconsult.auth.entity.SmsVerificationCode;
 import com.example.smartconsult.auth.mapper.SmsVerificationCodeMapper;
 import com.example.smartconsult.exception.BusinessException;
+import com.example.smartconsult.user.UserHealthProfileService;
 import com.example.smartconsult.user.UserService;
 import com.example.smartconsult.user.dto.UserProfileResponse;
 import com.example.smartconsult.user.entity.SysUser;
@@ -26,6 +27,7 @@ public class AuthService {
 
     private final SmsVerificationCodeMapper smsVerificationCodeMapper;
     private final UserService userService;
+    private final UserHealthProfileService userHealthProfileService;
     private final JwtTokenService jwtTokenService;
     private final SecureRandom secureRandom = new SecureRandom();
     private final long smsCodeExpiresInSeconds;
@@ -34,11 +36,13 @@ public class AuthService {
     public AuthService(
             SmsVerificationCodeMapper smsVerificationCodeMapper,
             UserService userService,
+            UserHealthProfileService userHealthProfileService,
             JwtTokenService jwtTokenService,
             @Value("${app.sms.code-expires-in-seconds}") long smsCodeExpiresInSeconds,
             @Value("${app.sms.mock-enabled}") boolean smsMockEnabled) {
         this.smsVerificationCodeMapper = smsVerificationCodeMapper;
         this.userService = userService;
+        this.userHealthProfileService = userHealthProfileService;
         this.jwtTokenService = jwtTokenService;
         this.smsCodeExpiresInSeconds = smsCodeExpiresInSeconds;
         this.smsMockEnabled = smsMockEnabled;
@@ -91,7 +95,7 @@ public class AuthService {
         response.setToken(jwtTokenService.createToken(user));
         response.setTokenType("Bearer");
         response.setExpiresInSeconds(jwtTokenService.getExpiresInSeconds());
-        response.setUser(UserProfileResponse.from(user));
+        response.setUser(UserProfileResponse.from(user, userHealthProfileService.existsByUserId(user.getId())));
         response.setRegistered(registered);
         return response;
     }

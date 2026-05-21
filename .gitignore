@@ -37,6 +37,7 @@ Thumbs.db
 # Frontend
 smart-consult-web/node_modules/
 smart-consult-web/dist/
+smart-consult-web/.vite/
 
 # Packaged artifacts
 *.jar

@@ -18,13 +18,16 @@ public class UserProfileResponse {
 
     private LocalDateTime lastLoginTime;
 
-    public static UserProfileResponse from(SysUser user) {
+    private boolean profileCompleted;
+
+    public static UserProfileResponse from(SysUser user, boolean profileCompleted) {
         UserProfileResponse response = new UserProfileResponse();
         response.setId(user.getId());
         response.setPhone(user.getPhone());
         response.setNickname(user.getNickname());
         response.setAvatarUrl(user.getAvatarUrl());
         response.setLastLoginTime(user.getLastLoginTime());
+        response.setProfileCompleted(profileCompleted);
         return response;
     }
 }
