@@ -49,11 +49,14 @@
 
 得到字段：
 
-| 字段 | 用途 |
-| --- | --- |
-| profile_confirmed | 是否确认建档资料有效 |
-| updated_weight_kg | 更新 BMI |
-| updated_waist_cm | 更新中心型肥胖判断 |
+| 字段                 | 用途         |
+|--------------------|------------|
+| profile_confirmed  | 是否确认建档资料有效 |
+| updated_weight_kg  | 更新 BMI     |
+| updated_height_cm  | 更新 BMI     |
+| updated_birth_date | 更新 年龄      |
+| updated_sex        | 更新 性别      |
+| updated_waist_cm   | 更新中心型肥胖判断  |
 
 ### 首轮问题 2：吸烟与二手烟
 
