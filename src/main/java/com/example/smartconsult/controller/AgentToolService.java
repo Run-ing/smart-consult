@@ -1,13 +1,18 @@
 package com.example.smartconsult.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.smartconsult.assessment.AssessmentSessionService;
+import com.example.smartconsult.assessment.entity.AssessmentAnswer;
 import com.example.smartconsult.assessment.entity.AssessmentQuestion;
+import com.example.smartconsult.assessment.entity.AssessmentSession;
+import com.example.smartconsult.assessment.mapper.AssessmentAnswerMapper;
 import com.example.smartconsult.assessment.mapper.AssessmentQuestionMapper;
 import com.example.smartconsult.auth.CurrentUserContext;
 import com.example.smartconsult.exception.BusinessException;
 import com.example.smartconsult.user.UserHealthProfileService;
 import com.example.smartconsult.user.dto.UserHealthProfileResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,6 +20,7 @@ import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class AgentToolService {
 
@@ -22,14 +28,20 @@ public class AgentToolService {
 
     private final UserHealthProfileService userHealthProfileService;
     private final AssessmentQuestionMapper assessmentQuestionMapper;
+    private final AssessmentAnswerMapper assessmentAnswerMapper;
+    private final AssessmentSessionService assessmentSessionService;
     private final ObjectMapper objectMapper;
 
     public AgentToolService(
             UserHealthProfileService userHealthProfileService,
             AssessmentQuestionMapper assessmentQuestionMapper,
+            AssessmentAnswerMapper assessmentAnswerMapper,
+            AssessmentSessionService assessmentSessionService,
             ObjectMapper objectMapper) {
         this.userHealthProfileService = userHealthProfileService;
         this.assessmentQuestionMapper = assessmentQuestionMapper;
+        this.assessmentAnswerMapper = assessmentAnswerMapper;
+        this.assessmentSessionService = assessmentSessionService;
         this.objectMapper = objectMapper;
     }
 
@@ -51,35 +63,35 @@ public class AgentToolService {
         response.put("bmi", bmi);
         response.put("central_obesity", centralObesity.value());
         response.put("central_obesity_basis", centralObesity.basis());
+        log.info("获取当前用户信息工具");
         return response;
     }
 
-    public Map<String, Object> getNextQuestion(GetNextQuestionRequest request) {
-        if (request == null) {
-            throw new BusinessException(400, "get_next_question request must not be null");
-        }
-        if (request.getUserId() == null || request.getAssessmentSessionId() == null || isBlank(request.getCurrentStage())) {
-            throw new BusinessException(400, "user_id, assessment_session_id and current_stage are required");
-        }
-
-        AssessmentQuestion previousQuestion = null;
-        if (request.getPreviousQuestionId() != null) {
-            previousQuestion = assessmentQuestionMapper.selectById(request.getPreviousQuestionId());
-        }
+    public Map<String, Object> getNextQuestion() {
+        Long currentUserId = resolveUserId();
+        AssessmentSession session = assessmentSessionService.getOrCreateInProgressSession(currentUserId);
 
         LambdaQueryWrapper<AssessmentQuestion> wrapper = new LambdaQueryWrapper<AssessmentQuestion>()
-                .eq(AssessmentQuestion::getStage, request.getCurrentStage())
                 .eq(AssessmentQuestion::getStatus, 1)
-                .orderByAsc(AssessmentQuestion::getQuestionOrder)
                 .last("LIMIT 1");
-        if (previousQuestion != null) {
-            wrapper.gt(AssessmentQuestion::getQuestionOrder, previousQuestion.getQuestionOrder());
+
+        if (session.getCurrentQuestionId() == null) {
+            wrapper.eq(AssessmentQuestion::getStage, defaultStage(session.getCurrentStage()))
+                    .orderByAsc(AssessmentQuestion::getQuestionOrder);
+        } else {
+            AssessmentQuestion currentQuestion = assessmentQuestionMapper.selectById(session.getCurrentQuestionId());
+            if (currentQuestion == null) {
+                throw new BusinessException(404, "current assessment question not found");
+            }
+            wrapper.eq(AssessmentQuestion::getStage, currentQuestion.getStage())
+                    .eq(AssessmentQuestion::getQuestionOrder, currentQuestion.getQuestionOrder() + 1);
         }
 
         AssessmentQuestion question = assessmentQuestionMapper.selectOne(wrapper);
         if (question == null) {
             throw new BusinessException(404, "no next assessment question");
         }
+        assessmentSessionService.moveToQuestion(session.getId(), question.getId(), question.getStage());
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("question_id", question.getId());
@@ -89,11 +101,64 @@ public class AgentToolService {
         response.put("field_schema", readJsonValue(question.getFieldSchema()));
         response.put("branch_rules", readJsonValue(question.getBranchRules()));
         response.put("allow_skip", Boolean.TRUE.equals(question.getAllowSkip()));
+        log.info("获取下一题工具，questionId={}, questionOrder={}, sessionId={}", question.getId(), question.getQuestionOrder(), session.getId());
+        return response;
+    }
+
+    public Map<String, Object> saveQuestionAnswerFields(SaveQuestionAnswerFieldsRequest request) {
+        if (request == null) {
+            throw new BusinessException(400, "save_question_answer_fields request must not be null");
+        }
+        if (isBlank(request.getRawUserAnswer())) {
+            throw new BusinessException(400, "raw_user_answer is required");
+        }
+        if (isBlank(request.getConfidence())) {
+            throw new BusinessException(400, "confidence is required");
+        }
+
+        Long currentUserId = resolveUserId();
+        AssessmentSession session = assessmentSessionService.getOrCreateInProgressSession(currentUserId);
+        if (session.getCurrentQuestionId() == null) {
+            throw new BusinessException(400, "assessment session has no current question");
+        }
+
+        AssessmentAnswer answer = assessmentAnswerMapper.selectOne(new LambdaQueryWrapper<AssessmentAnswer>()
+                .eq(AssessmentAnswer::getSessionId, session.getId())
+                .eq(AssessmentAnswer::getQuestionId, session.getCurrentQuestionId())
+                .last("LIMIT 1"));
+        if (answer == null) {
+            answer = new AssessmentAnswer();
+            answer.setSessionId(session.getId());
+            answer.setUserId(currentUserId);
+            answer.setQuestionId(session.getCurrentQuestionId());
+        }
+        answer.setRawUserAnswer(request.getRawUserAnswer().trim());
+        answer.setExtractedFields(toJson(request.getExtractedFields()));
+        answer.setConfidence(request.getConfidence().trim());
+        answer.setSkipped(Boolean.TRUE.equals(request.getSkipped()) ? 1 : 0);
+        answer.setNeedFollowUp(Boolean.TRUE.equals(request.getNeedFollowUp()) ? 1 : 0);
+
+        if (answer.getId() == null) {
+            assessmentAnswerMapper.insert(answer);
+        } else {
+            assessmentAnswerMapper.updateById(answer);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("saved", true);
+        response.put("answer_id", answer.getId());
+        response.put("session_id", answer.getSessionId());
+        response.put("question_id", answer.getQuestionId());
+        log.info("保存题目回答工具，answerId={}, questionId={}, sessionId={}", answer.getId(), answer.getQuestionId(), answer.getSessionId());
         return response;
     }
 
     private Long resolveUserId() {
         return CurrentUserContext.getRequired().id();
+    }
+
+    private String defaultStage(String stage) {
+        return isBlank(stage) ? AssessmentSessionService.DEFAULT_STAGE : stage;
     }
 
     private BigDecimal calculateBmi(BigDecimal heightCm, BigDecimal weightKg) {
@@ -126,6 +191,17 @@ public class AgentToolService {
             return value;
         } catch (Exception exception) {
             throw new BusinessException(500, "invalid assessment question json");
+        }
+    }
+
+    private String toJson(Object value) {
+        if (value == null) {
+            return "{}";
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception exception) {
+            throw new BusinessException(500, "invalid extracted_fields json");
         }
     }
 

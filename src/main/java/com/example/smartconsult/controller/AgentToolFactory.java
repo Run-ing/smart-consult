@@ -20,8 +20,11 @@ public class AgentToolFactory {
                         .inputType(GetCurrentUserProfileRequest.class)
                         .build(),
                 FunctionToolCallback.builder("get_next_question", agentToolService::getNextQuestion)
-                        .description("Get exactly one next questionnaire question for the specified user assessment session and stage. Do not request or return the full question bank.")
-                        .inputType(GetNextQuestionRequest.class)
+                        .description("Get exactly one next questionnaire question for the current user's active assessment session. Do not request or return the full question bank.")
+                        .build(),
+                FunctionToolCallback.builder("save_question_answer_fields", agentToolService::saveQuestionAnswerFields)
+                        .description("Save the current question's raw user answer and extracted structured fields for the current user's active assessment session.")
+                        .inputType(SaveQuestionAnswerFieldsRequest.class)
                         .build()
         };
     }

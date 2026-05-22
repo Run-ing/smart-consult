@@ -31,7 +31,7 @@
           <p class="eyebrow">CONSULTATION</p>
           <h2>健康问答</h2>
         </div>
-        <span class="advisor-status">在线</span>
+        <span class="advisor-status">{{ replying ? '思考中' : '在线' }}</span>
       </header>
 
       <div ref="messageListRef" class="message-list">
@@ -53,7 +53,7 @@
           v-model.trim="draft"
           type="text"
           autocomplete="off"
-          placeholder="描述你的症状、体检指标或健康问题"
+          placeholder="回复当前问题"
         />
         <button class="primary-button" type="submit" :disabled="!draft || replying">
           {{ replying ? '思考中...' : '发送' }}
@@ -66,7 +66,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { sendAgentMessage, startAgentConversation } from '../api/agent'
 import { fetchCurrentUser, type UserProfile } from '../api/auth'
+import { getApiErrorMessage } from '../api/http'
 import { clearAuth, getStoredUser, getToken, setAuth } from '../stores/auth'
 
 interface ChatMessage {
@@ -79,14 +81,9 @@ const router = useRouter()
 const user = ref<UserProfile | null>(getStoredUser())
 const draft = ref('')
 const replying = ref(false)
+const initialized = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
-const messages = ref<ChatMessage[]>([
-  {
-    id: 1,
-    role: 'assistant',
-    content: '你好，我是你的智能健康顾问。你可以告诉我最近的不适、体检指标，或想重点管理的健康目标。'
-  }
-])
+const messages = ref<ChatMessage[]>([])
 
 const formattedLoginTime = computed(() => {
   if (!user.value?.lastLoginTime) {
@@ -106,12 +103,39 @@ onMounted(async () => {
     setAuth(getToken(), currentUser)
     if (!currentUser.profileCompleted) {
       await router.push('/profile-setup')
+      return
     }
+    await initializeConversation()
   } catch {
     clearAuth()
     await router.push('/login')
   }
 })
+
+async function initializeConversation() {
+  if (initialized.value || replying.value) {
+    return
+  }
+  initialized.value = true
+  replying.value = true
+  try {
+    const response = await startAgentConversation()
+    messages.value.push({
+      id: Date.now(),
+      role: 'assistant',
+      content: response.message || '暂时没有返回内容，请稍后再试。'
+    })
+  } catch (error) {
+    messages.value.push({
+      id: Date.now(),
+      role: 'assistant',
+      content: getApiErrorMessage(error)
+    })
+  } finally {
+    replying.value = false
+    await scrollToBottom()
+  }
+}
 
 async function sendMessage() {
   const content = draft.value
@@ -128,15 +152,23 @@ async function sendMessage() {
   replying.value = true
   await scrollToBottom()
 
-  window.setTimeout(async () => {
+  try {
+    const response = await sendAgentMessage(content)
     messages.value.push({
       id: Date.now() + 1,
       role: 'assistant',
-      content: `我已经记录你的问题：“${content}”。当前版本先展示对话流程，接入真实 LLM 接口后会结合你的健康档案给出更具体的分析和建议。`
+      content: response.message || '暂时没有返回内容，请稍后再试。'
     })
+  } catch (error) {
+    messages.value.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      content: getApiErrorMessage(error)
+    })
+  } finally {
     replying.value = false
     await scrollToBottom()
-  }, 500)
+  }
 }
 
 async function scrollToBottom() {

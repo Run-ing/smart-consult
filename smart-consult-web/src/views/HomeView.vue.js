@@ -1,19 +1,16 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { sendAgentMessage, startAgentConversation } from '../api/agent';
 import { fetchCurrentUser } from '../api/auth';
+import { getApiErrorMessage } from '../api/http';
 import { clearAuth, getStoredUser, getToken, setAuth } from '../stores/auth';
 const router = useRouter();
 const user = ref(getStoredUser());
 const draft = ref('');
 const replying = ref(false);
+const initialized = ref(false);
 const messageListRef = ref(null);
-const messages = ref([
-    {
-        id: 1,
-        role: 'assistant',
-        content: '你好，我是你的智能健康顾问。你可以告诉我最近的不适、体检指标，或想重点管理的健康目标。'
-    }
-]);
+const messages = ref([]);
 const formattedLoginTime = computed(() => {
     if (!user.value?.lastLoginTime) {
         return '-';
@@ -31,13 +28,41 @@ onMounted(async () => {
         setAuth(getToken(), currentUser);
         if (!currentUser.profileCompleted) {
             await router.push('/profile-setup');
+            return;
         }
+        await initializeConversation();
     }
     catch {
         clearAuth();
         await router.push('/login');
     }
 });
+async function initializeConversation() {
+    if (initialized.value || replying.value) {
+        return;
+    }
+    initialized.value = true;
+    replying.value = true;
+    try {
+        const response = await startAgentConversation();
+        messages.value.push({
+            id: Date.now(),
+            role: 'assistant',
+            content: response.message || '暂时没有返回内容，请稍后再试。'
+        });
+    }
+    catch (error) {
+        messages.value.push({
+            id: Date.now(),
+            role: 'assistant',
+            content: getApiErrorMessage(error)
+        });
+    }
+    finally {
+        replying.value = false;
+        await scrollToBottom();
+    }
+}
 async function sendMessage() {
     const content = draft.value;
     if (!content || replying.value) {
@@ -51,15 +76,25 @@ async function sendMessage() {
     draft.value = '';
     replying.value = true;
     await scrollToBottom();
-    window.setTimeout(async () => {
+    try {
+        const response = await sendAgentMessage(content);
         messages.value.push({
             id: Date.now() + 1,
             role: 'assistant',
-            content: `我已经记录你的问题：“${content}”。当前版本先展示对话流程，接入真实 LLM 接口后会结合你的健康档案给出更具体的分析和建议。`
+            content: response.message || '暂时没有返回内容，请稍后再试。'
         });
+    }
+    catch (error) {
+        messages.value.push({
+            id: Date.now() + 1,
+            role: 'assistant',
+            content: getApiErrorMessage(error)
+        });
+    }
+    finally {
         replying.value = false;
         await scrollToBottom();
-    }, 500);
+    }
 }
 async function scrollToBottom() {
     await nextTick();
@@ -124,6 +159,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
     ...{ class: "advisor-status" },
 });
+(__VLS_ctx.replying ? '思考中' : '在线');
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ref: "messageListRef",
     ...{ class: "message-list" },
@@ -153,7 +189,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     value: (__VLS_ctx.draft),
     type: "text",
     autocomplete: "off",
-    placeholder: "描述你的症状、体检指标或健康问题",
+    placeholder: "回复当前问题",
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ class: "primary-button" },

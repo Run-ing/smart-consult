@@ -20,13 +20,13 @@
 
 2. get_next_question
    用途：获取下一道需要询问的问卷题目。
-   输入应至少包含：user_id、assessment_session_id、current_stage、previous_question_id 或已完成字段摘要。
+   输入：不需要业务参数。后端会根据当前登录用户自动获取或创建进行中的 assessment_session，并根据会话中的 current_question_id 推导下一题。
    返回应至少包含：question_id、question_order、question_text、expected_fields、field_schema、branch_rules、allow_skip。
    重要规则：每次只获取一道题，不要请求全量题库。
 
 3. save_question_answer_fields
    用途：保存当前题目的用户原始回答和抽取后的结构化字段。
-   输入应至少包含：user_id、assessment_session_id、question_id、raw_user_answer、extracted_fields、confidence、need_follow_up。
+   输入应至少包含：raw_user_answer、extracted_fields、confidence、need_follow_up，可选 skipped。不要传 user_id、assessment_session_id、question_id；后端会根据当前登录用户和进行中的 assessment_session 自动保存到当前题目。
    保存成功后才能进入下一题。
 
 4. update_user_profile
